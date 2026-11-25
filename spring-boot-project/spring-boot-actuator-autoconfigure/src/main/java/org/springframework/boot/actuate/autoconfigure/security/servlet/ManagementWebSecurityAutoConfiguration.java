@@ -31,8 +31,11 @@ import org.springframework.boot.autoconfigure.security.saml2.Saml2RelyingPartyAu
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.AndRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.util.ClassUtils;
 
 import static org.springframework.security.config.Customizer.withDefaults;
@@ -60,7 +63,7 @@ public class ManagementWebSecurityAutoConfiguration {
 	@Order(SecurityProperties.BASIC_AUTH_ORDER)
 	SecurityFilterChain managementSecurityFilterChain(HttpSecurity http) throws Exception {
 		http.authorizeHttpRequests((requests) -> {
-			requests.requestMatchers(EndpointRequest.to(HealthEndpoint.class)).permitAll();
+			requests.requestMatchers(healthMatcher()).permitAll();
 			requests.anyRequest().authenticated();
 		});
 		if (ClassUtils.isPresent("org.springframework.web.servlet.DispatcherServlet", null)) {
@@ -69,6 +72,11 @@ public class ManagementWebSecurityAutoConfiguration {
 		http.formLogin(withDefaults());
 		http.httpBasic(withDefaults());
 		return http.build();
+	}
+
+	private RequestMatcher healthMatcher() {
+		return new AndRequestMatcher(EndpointRequest.to(HealthEndpoint.class),
+				(request) -> HttpMethod.GET.matches(request.getMethod()));
 	}
 
 }

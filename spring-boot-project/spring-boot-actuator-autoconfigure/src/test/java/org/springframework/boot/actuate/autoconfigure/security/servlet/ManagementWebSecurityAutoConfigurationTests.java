@@ -98,6 +98,12 @@ class ManagementWebSecurityAutoConfigurationTests {
 	}
 
 	@Test
+	void nonGetRequestsToHealthAreNotPermitted() {
+		this.contextRunner.run((context) -> assertThat(getResponseStatus(context, "/actuator/health", "OPTIONS"))
+			.isEqualTo(HttpStatus.UNAUTHORIZED));
+	}
+
+	@Test
 	void usesMatchersBasedOffConfiguredActuatorBasePath() {
 		this.contextRunner.withPropertyValues("management.endpoints.web.base-path=/").run((context) -> {
 			HttpStatus status = getResponseStatus(context, "/health");
@@ -161,13 +167,18 @@ class ManagementWebSecurityAutoConfigurationTests {
 
 	private HttpStatus getResponseStatus(AssertableWebApplicationContext context, String path)
 			throws IOException, jakarta.servlet.ServletException {
+		return getResponseStatus(context, path, "GET");
+	}
+
+	private HttpStatus getResponseStatus(AssertableWebApplicationContext context, String path, String method)
+			throws IOException, jakarta.servlet.ServletException {
 		FilterChainProxy filterChainProxy = context.getBean(FilterChainProxy.class);
 		MockServletContext servletContext = new MockServletContext();
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		servletContext.setAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, context);
 		MockHttpServletRequest request = new MockHttpServletRequest(servletContext);
 		request.setServletPath(path);
-		request.setMethod("GET");
+		request.setMethod(method);
 		filterChainProxy.doFilter(request, response, new MockFilterChain());
 		return HttpStatus.valueOf(response.getStatus());
 	}
