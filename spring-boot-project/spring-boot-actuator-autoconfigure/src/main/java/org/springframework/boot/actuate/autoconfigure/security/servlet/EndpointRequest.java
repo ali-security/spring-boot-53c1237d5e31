@@ -117,6 +117,20 @@ public final class EndpointRequest {
 	}
 
 	/**
+	 * Return the given user supplied path normalized so that it has no trailing slashes.
+	 * @param path the path to normalize
+	 * @return the path without trailing slashes
+	 */
+	private static String withoutTrailingSlash(String path) {
+		Assert.hasText(path, "'path' must not be empty");
+		String normalizedPath = path;
+		while (normalizedPath.endsWith("/")) {
+			normalizedPath = normalizedPath.substring(0, normalizedPath.length() - 1);
+		}
+		return normalizedPath;
+	}
+
+	/**
 	 * Base class for supported request matchers.
 	 */
 	private abstract static class AbstractRequestMatcher
@@ -163,10 +177,18 @@ public final class EndpointRequest {
 
 		protected List<RequestMatcher> getLinksMatchers(RequestMatcherFactory requestMatcherFactory,
 				RequestMatcherProvider matcherProvider, String basePath) {
+			String linksPath = getLinksPath(basePath);
 			List<RequestMatcher> linksMatchers = new ArrayList<>();
-			linksMatchers.add(requestMatcherFactory.antPath(matcherProvider, basePath));
-			linksMatchers.add(requestMatcherFactory.antPath(matcherProvider, basePath, "/"));
+			linksMatchers.add(requestMatcherFactory.antPath(matcherProvider, linksPath));
+			if (!linksPath.endsWith("/")) {
+				linksMatchers.add(requestMatcherFactory.antPath(matcherProvider, linksPath, "/"));
+			}
 			return linksMatchers;
+		}
+
+		private String getLinksPath(String basePath) {
+			String linksPath = withoutTrailingSlash(basePath);
+			return StringUtils.hasText(linksPath) ? linksPath : "/";
 		}
 
 		protected RequestMatcherProvider getRequestMatcherProvider(WebApplicationContext context) {
@@ -258,7 +280,8 @@ public final class EndpointRequest {
 		private List<RequestMatcher> getDelegateMatchers(RequestMatcherFactory requestMatcherFactory,
 				RequestMatcherProvider matcherProvider, Set<String> paths) {
 			return paths.stream()
-				.map((path) -> requestMatcherFactory.antPath(matcherProvider, path, "/**"))
+				.map((path) -> withoutTrailingSlash(path) + "/**")
+				.map((pattern) -> requestMatcherFactory.antPath(matcherProvider, pattern))
 				.collect(Collectors.toCollection(ArrayList::new));
 		}
 

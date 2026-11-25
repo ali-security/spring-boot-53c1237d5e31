@@ -116,6 +116,20 @@ public final class EndpointRequest {
 	}
 
 	/**
+	 * Return the given user supplied path normalized so that it has no trailing slashes.
+	 * @param path the path to normalize
+	 * @return the path without trailing slashes
+	 */
+	private static String withoutTrailingSlash(String path) {
+		Assert.hasText(path, "'path' must not be empty");
+		String normalizedPath = path;
+		while (normalizedPath.endsWith("/")) {
+			normalizedPath = normalizedPath.substring(0, normalizedPath.length() - 1);
+		}
+		return normalizedPath;
+	}
+
+	/**
 	 * Base class for supported request matchers.
 	 */
 	private abstract static class AbstractWebExchangeMatcher<T> extends ApplicationContextServerWebExchangeMatcher<T> {
@@ -244,7 +258,8 @@ public final class EndpointRequest {
 
 		private PathPatternParserServerWebExchangeMatcher getDelegateMatcher(String path) {
 			Assert.notNull(path, "'path' must not be null");
-			return new PathPatternParserServerWebExchangeMatcher(path + "/**");
+			String pattern = withoutTrailingSlash(path) + "/**";
+			return new PathPatternParserServerWebExchangeMatcher(pattern);
 		}
 
 		@Override
@@ -299,11 +314,20 @@ public final class EndpointRequest {
 
 		private ServerWebExchangeMatcher createDelegate(WebEndpointProperties properties) {
 			if (StringUtils.hasText(properties.getBasePath())) {
-				return new OrServerWebExchangeMatcher(
-						new PathPatternParserServerWebExchangeMatcher(properties.getBasePath()),
-						new PathPatternParserServerWebExchangeMatcher(properties.getBasePath() + "/"));
+				String linksPath = getLinksPath(properties.getBasePath());
+				List<ServerWebExchangeMatcher> linksMatchers = new ArrayList<>();
+				linksMatchers.add(new PathPatternParserServerWebExchangeMatcher(linksPath));
+				if (!linksPath.endsWith("/")) {
+					linksMatchers.add(new PathPatternParserServerWebExchangeMatcher(linksPath + "/"));
+				}
+				return new OrServerWebExchangeMatcher(linksMatchers);
 			}
 			return EMPTY_MATCHER;
+		}
+
+		private String getLinksPath(String basePath) {
+			String linksPath = withoutTrailingSlash(basePath);
+			return StringUtils.hasText(linksPath) ? linksPath : "/";
 		}
 
 		@Override

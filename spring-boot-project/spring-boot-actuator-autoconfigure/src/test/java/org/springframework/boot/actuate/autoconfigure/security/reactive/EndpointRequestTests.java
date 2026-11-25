@@ -131,6 +131,47 @@ class EndpointRequestTests {
 	}
 
 	@Test
+	void toLinksWhenBasePathIsSlashShouldNotMatch() {
+		ServerWebExchangeMatcher matcher = EndpointRequest.toLinks();
+		RequestMatcherAssert assertMatcher = assertMatcher(matcher, "/");
+		assertMatcher.doesNotMatch("/actuator/foo");
+		assertMatcher.doesNotMatch("/actuator/bar");
+		assertMatcher.doesNotMatch("/");
+	}
+
+	@Test
+	void toLinksWhenBasePathHasTrailingSlashesShouldMatchLinks() {
+		ServerWebExchangeMatcher matcher = EndpointRequest.toLinks();
+		RequestMatcherAssert assertMatcher = assertMatcher(matcher, "/actuator//");
+		assertMatcher.matches("/actuator");
+		assertMatcher.matches("/actuator/");
+		assertMatcher.doesNotMatch("/actuator/foo");
+	}
+
+	@Test
+	void toEndpointWhenPathMappedWithTrailingSlashShouldMatchEndpointPath() {
+		ServerWebExchangeMatcher matcher = EndpointRequest.to("foo");
+		RequestMatcherAssert assertMatcher = assertMatcher(matcher,
+				new PathMappedEndpoints("/actuator", () -> List.of(mockEndpoint(EndpointId.of("foo"), "foo/"))));
+		assertMatcher.matches("/actuator/foo");
+		assertMatcher.matches("/actuator/foo/");
+		assertMatcher.matches("/actuator/foo/baz");
+		assertMatcher.doesNotMatch("/actuator/bar");
+	}
+
+	@Test
+	void toAnyEndpointWhenPathMappedWithMultipleTrailingSlashesShouldMatchEndpointPath() {
+		ServerWebExchangeMatcher matcher = EndpointRequest.toAnyEndpoint();
+		RequestMatcherAssert assertMatcher = assertMatcher(matcher, new PathMappedEndpoints("/actuator",
+				() -> List.of(mockEndpoint(EndpointId.of("foo"), "foo"), mockEndpoint(EndpointId.of("bar"), "bar//"))));
+		assertMatcher.matches("/actuator/foo");
+		assertMatcher.matches("/actuator/bar");
+		assertMatcher.matches("/actuator/bar/");
+		assertMatcher.matches("/actuator/bar/baz");
+		assertMatcher.doesNotMatch("/actuator/baz");
+	}
+
+	@Test
 	void excludeByClassShouldNotMatchExcluded() {
 		ServerWebExchangeMatcher matcher = EndpointRequest.toAnyEndpoint()
 			.excluding(FooEndpoint.class, BazServletEndpoint.class);

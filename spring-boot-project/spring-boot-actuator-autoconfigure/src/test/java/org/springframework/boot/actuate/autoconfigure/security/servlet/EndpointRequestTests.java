@@ -138,6 +138,53 @@ class EndpointRequestTests {
 	}
 
 	@Test
+	void toLinksWhenBasePathIsSlashShouldNotMatch() {
+		RequestMatcher matcher = EndpointRequest.toLinks();
+		RequestMatcherAssert assertMatcher = assertMatcher(matcher, "/");
+		assertMatcher.doesNotMatch("/actuator/foo");
+		assertMatcher.doesNotMatch("/actuator/bar");
+		assertMatcher.doesNotMatch("/");
+	}
+
+	@Test
+	void toLinksWhenBasePathHasTrailingSlashesShouldMatchLinks() {
+		RequestMatcher matcher = EndpointRequest.toLinks();
+		RequestMatcherAssert assertMatcher = assertMatcher(matcher, "/actuator//");
+		assertMatcher.matches("/actuator");
+		assertMatcher.matches("/actuator/");
+		assertMatcher.doesNotMatch("/actuator/foo");
+	}
+
+	@Test
+	void toAnyEndpointWhenBasePathHasTrailingSlashShouldMatchLinks() {
+		RequestMatcher matcher = EndpointRequest.toAnyEndpoint();
+		RequestMatcherAssert assertMatcher = assertMatcher(matcher, "/actuator/");
+		assertMatcher.matches("/actuator");
+		assertMatcher.matches("/actuator/");
+	}
+
+	@Test
+	void toEndpointWhenPathMappedWithTrailingSlashShouldMatchEndpointPath() {
+		RequestMatcher matcher = EndpointRequest.to("bar");
+		RequestMatcherAssert assertMatcher = assertMatcher(matcher);
+		assertMatcher.matches("/actuator/bar");
+		assertMatcher.matches("/actuator/bar/");
+		assertMatcher.matches("/actuator/bar/baz");
+		assertMatcher.doesNotMatch("/actuator/foo");
+	}
+
+	@Test
+	void toEndpointWhenPathMappedWithMultipleTrailingSlashesShouldMatchEndpointPath() {
+		RequestMatcher matcher = EndpointRequest.to("foo");
+		RequestMatcherAssert assertMatcher = assertMatcher(matcher,
+				new PathMappedEndpoints("/actuator", () -> List.of(mockEndpoint(EndpointId.of("foo"), "foo//"))));
+		assertMatcher.matches("/actuator/foo");
+		assertMatcher.matches("/actuator/foo/");
+		assertMatcher.matches("/actuator/foo/baz");
+		assertMatcher.doesNotMatch("/actuator/bar");
+	}
+
+	@Test
 	void excludeByClassShouldNotMatchExcluded() {
 		RequestMatcher matcher = EndpointRequest.toAnyEndpoint().excluding(FooEndpoint.class, BazServletEndpoint.class);
 		List<ExposableEndpoint<?>> endpoints = new ArrayList<>();
@@ -269,7 +316,7 @@ class EndpointRequestTests {
 	private PathMappedEndpoints mockPathMappedEndpoints(String basePath) {
 		List<ExposableEndpoint<?>> endpoints = new ArrayList<>();
 		endpoints.add(mockEndpoint(EndpointId.of("foo"), "foo"));
-		endpoints.add(mockEndpoint(EndpointId.of("bar"), "bar"));
+		endpoints.add(mockEndpoint(EndpointId.of("bar"), "bar/"));
 		return new PathMappedEndpoints(basePath, () -> endpoints);
 	}
 
