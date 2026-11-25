@@ -1,19 +1,23 @@
 name: CI
 on:
-  push:
-    branches:
-      - 3.2.x
+  workflow_dispatch:
+    inputs:
+      test-filter:
+        description: 'Gradle test task and --tests selectors to run instead of the scoped build (empty = scoped build)'
+        required: false
+        default: ''
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   ci:
     name: '${{ matrix.os.name}} | Java ${{ matrix.java.version}}'
     runs-on: ${{ matrix.os.id }}
-    if: ${{ github.repository == 'spring-projects/spring-boot' }}
+    timeout-minutes: 50
     strategy:
+      fail-fast: false
       matrix:
         os:
-          - id: ubuntu22-8-32
+          - id: ubuntu-latest
             name: Linux
           - id: windows-latest
             name: Windows
@@ -36,6 +40,11 @@ jobs:
           git config --global core.autocrlf true
           git config --global core.longPaths true
           Stop-Service -name Docker
+      - name: Prepare Linux runner
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          docker version
+          echo 'api.version=1.44' > "$HOME/.docker-java.properties"
       - name: Check Out Code
         uses: actions/checkout@v4
       - name: Build
@@ -47,11 +56,4 @@ jobs:
           gradle-enterprise-secret-access-key: ${{ secrets.GRADLE_ENTERPRISE_SECRET_ACCESS_KEY }}
           gradle-enterprise-cache-user: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USER }}
           gradle-enterprise-cache-password: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
-      - name: Send Notification
-        uses: ./.github/actions/send-notification
-        if: always()
-        with:
-          webhook-url: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
-          status: ${{ job.status }}
-          build-scan-url: ${{ steps.build.outputs.build-scan-url }}
-          run-name: ${{ format('{0} | {1} | Java {2}', github.ref_name, matrix.os.name, matrix.java.version) }}
+          build-tasks: ${{ inputs.test-filter != '' && format(':spring-boot-project:spring-boot-actuator-autoconfigure:assemble {0} -x checkstyleMain -x checkstyleTest -x checkFormatMain -x checkFormatTest -x checkArchitectureMain -x checkArchitectureTest', inputs.test-filter) || ':spring-boot-project:spring-boot-actuator-autoconfigure:build :spring-boot-project:spring-boot-actuator:test -x checkstyleMain -x checkstyleTest -x checkFormatMain -x checkFormatTest -x checkArchitectureMain -x checkArchitectureTest' }}

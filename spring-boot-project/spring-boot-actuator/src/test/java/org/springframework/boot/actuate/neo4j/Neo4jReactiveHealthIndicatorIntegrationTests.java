@@ -50,6 +50,7 @@ class Neo4jReactiveHealthIndicatorIntegrationTests {
 
 	@Container
 	private static final Neo4jContainer<?> neo4jServer = new Neo4jContainer<>(DockerImageNames.neo4j())
+		.withEnv("NEO4J_dbms_jvm_additional", "-XX:-UseContainerSupport")
 		.withStartupAttempts(5)
 		.withStartupTimeout(Duration.ofMinutes(10));
 
