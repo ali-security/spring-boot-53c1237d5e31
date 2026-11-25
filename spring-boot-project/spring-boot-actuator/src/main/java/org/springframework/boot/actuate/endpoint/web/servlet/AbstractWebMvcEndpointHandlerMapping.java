@@ -103,6 +103,9 @@ public abstract class AbstractWebMvcEndpointHandlerMapping extends RequestMappin
 	private final Method handleMethod = ReflectionUtils.findMethod(OperationHandler.class, "handle",
 			HttpServletRequest.class, Map.class);
 
+	private final Method catchAllMethod = ReflectionUtils.findMethod(CatchAllHandler.class, "handle",
+			HttpServletResponse.class);
+
 	private RequestMappingInfo.BuilderConfiguration builderConfig = new RequestMappingInfo.BuilderConfiguration();
 
 	/**
@@ -193,6 +196,17 @@ public abstract class AbstractWebMvcEndpointHandlerMapping extends RequestMappin
 	protected ServletWebOperation wrapServletWebOperation(ExposableWebEndpoint endpoint, WebOperation operation,
 			ServletWebOperation servletWebOperation) {
 		return servletWebOperation;
+	}
+
+	/**
+	 * Register a "catch all" handler for the rest of actuator namespace, ensuring that
+	 * all requests are handled by this handler mapping.
+	 * @param responseStatus the response status to use for handled requests
+	 */
+	protected void registerCatchAllMapping(HttpStatus responseStatus) {
+		String subPath = this.endpointMapping.createSubPath("/**");
+		registerMapping(RequestMappingInfo.paths(subPath).options(this.builderConfig).build(),
+				new CatchAllHandler(responseStatus), this.catchAllMethod);
 	}
 
 	private RequestMappingInfo createRequestMappingInfo(WebOperationRequestPredicate predicate, String path) {
@@ -442,6 +456,24 @@ public abstract class AbstractWebMvcEndpointHandlerMapping extends RequestMappin
 	}
 
 	/**
+	 * Catch-all handler that always replies with a fixed HTTP status.
+	 */
+	private static final class CatchAllHandler {
+
+		private final HttpStatus responseStatus;
+
+		CatchAllHandler(HttpStatus responseStatus) {
+			this.responseStatus = responseStatus;
+		}
+
+		@Reflective
+		void handle(HttpServletResponse response) {
+			response.setStatus(this.responseStatus.value());
+		}
+
+	}
+
+	/**
 	 * {@link HandlerMethod} subclass for endpoint information logging.
 	 */
 	private static class WebMvcEndpointHandlerMethod extends HandlerMethod {
@@ -500,7 +532,7 @@ public abstract class AbstractWebMvcEndpointHandlerMapping extends RequestMappin
 
 		@Override
 		public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
-			this.reflectiveRegistrar.registerRuntimeHints(hints, OperationHandler.class);
+			this.reflectiveRegistrar.registerRuntimeHints(hints, OperationHandler.class, CatchAllHandler.class);
 		}
 
 	}

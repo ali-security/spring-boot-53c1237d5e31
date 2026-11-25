@@ -58,7 +58,10 @@ import org.springframework.context.annotation.Import;
 import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.stereotype.Controller;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.cors.CorsConfiguration;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -210,6 +213,26 @@ class CloudFoundryWebFluxEndpointIntegrationTests {
 			.doesNotExist()));
 	}
 
+	@Test
+	void unknownEndpointsAreForbidden() {
+		this.contextRunner.run(withWebTestClient(
+				(client) -> client.get().uri("/cfApplication/unknown").exchange().expectStatus().isForbidden()));
+	}
+
+	@Test
+	void applicationEndpointsMappedBeneathCloudFoundryPathAreForbidden() {
+		this.contextRunner.withUserConfiguration(ApplicationEndpointConfiguration.class)
+			.run(withWebTestClient((client) -> client.get()
+				.uri("/cfApplication/admin")
+				.accept(MediaType.APPLICATION_JSON)
+				.exchange()
+				.expectStatus()
+				.isForbidden()
+				.expectBody()
+				.jsonPath("secret")
+				.doesNotExist()));
+	}
+
 	private ContextConsumer<AssertableReactiveWebApplicationContext> withWebTestClient(
 			Consumer<WebTestClient> clientConsumer) {
 		return (context) -> {
@@ -315,6 +338,32 @@ class CloudFoundryWebFluxEndpointIntegrationTests {
 		@ReadOperation
 		Map<String, Object> readAll() {
 			return Collections.singletonMap("All", true);
+		}
+
+	}
+
+	/**
+	 * An application controller mapped beneath the Cloud Foundry base path. Such a
+	 * mapping is not recommended but must not be reachable, as the Cloud Foundry paths
+	 * are not protected by Spring Security.
+	 */
+	@Controller
+	static class ApplicationController {
+
+		@GetMapping(path = "/cfApplication/admin", produces = MediaType.APPLICATION_JSON_VALUE)
+		@ResponseBody
+		Map<String, Object> admin() {
+			return Collections.singletonMap("secret", true);
+		}
+
+	}
+
+	@Configuration(proxyBeanMethods = false)
+	static class ApplicationEndpointConfiguration {
+
+		@Bean
+		ApplicationController applicationController() {
+			return new ApplicationController();
 		}
 
 	}
